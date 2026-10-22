@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon TCG Collection Tracker</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --text-color: #f0f0f0;
+            --panel-bg: #2a2a2a;
+            --border-color: #444;
+            --accent-color: #e3350d; /* Pokémon Red */
+            --holo-gradient: linear-gradient(125deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.4) 40%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0.4) 60%, rgba(255,255,255,0) 80%);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        select, button {
+            background-color: #333;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:hover, button:hover {
+            background-color: #444;
+            border-color: #666;
+        }
+
+        .progress-container {
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* 6-Card Grid Layout */
+        #card-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Card Styling */
+        .card {
+            aspect-ratio: 63 / 88;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            padding: 8px;
+            box-sizing: border-box;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            
+            /* Unowned State (Default) */
+            filter: grayscale(100%) opacity(70%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            border: 8px solid #bba14f; /* Classic EN yellow border default */
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Owned State */
+        .card.owned {
+            filter: grayscale(0%) opacity(100%);
+            box-shadow: 0 8px 15px rgba(227, 53, 13, 0.4);
+        }
+
+        /* Holographic overlay effect for owned cards */
+        .card.owned::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 50%; height: 100%;
+            background: var(--holo-gradient);
+            transform: skewX(-20deg);
+            animation: holoShine 3s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes holoShine {
+            0% { left: -100%; }
+            20% { left: 200%; }
+            100% { left: 200%; }
+        }
+
+        /* Regional Border Styling */
+        .card.border-en { border-color: #fcc331; } /* Classic Yellow */
+        .card.border-jp { border-color: #a8a8a8; } /* Silver/Metallic */
+        .card.border-zh { border-color: #c4c4c4; } /* Silver/Metallic */
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #111;
+            margin-bottom: 5px;
+        }
+
+        .card-art {
+            flex-grow: 1;
+            background: #d4e1f9;
+            border: 2px solid #999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-art img {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.3));
+        }
+
+        .card-footer {
+            margin-top: 5px;
+            font-size: 0.75em;
+            color: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .owned-badge {
+            display: none;
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            width: 20px; height: 20px;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .card.owned .owned-badge {
+            display: block;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) { #card-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 800px) { #card-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 500px) { #card-grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>Pokémon TCG Collection Tracker</h2>
+        <div class="controls">
+            <div>
+                <label>Set: </label>
+                <select id="set-select">
+                    <option value="30th-anniversary">30th Anniversary Set (Custom)</option>
+                    <option value="base-set">Base Set (Classic)</option>
+                </select>
+            </div>
+            <div>
+                <label>Language: </label>
+                <select id="lang-select">
+                    <option value="EN">🇬🇧 English</option>
+                    <option value="JP">🇯🇵 Japanese (日本語)</option>
+                    <option value="ZH">🇹🇼 Trad. Chinese (繁體中文)</option>
+                </select>
+            </div>
+            <button id="reset-btn">Reset Current View</button>
+        </div>
+        <div class="progress-container">
+            <span id="progress-text">Progress: 0 / 0 Cards Owned (0%)</span>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+    </header>
+
+    <div id="card-grid">
+        <!-- Cards will be generated here by JavaScript -->
+    </div>
+
+    <script>
+        // --- Mock Database for Sets ---
+        // Using PokéAPI image URLs for artwork placeholders
+        const cardDatabase = {
+            "30th-anniversary": [
+                { id: "001", dex: 1, hp: 70, type: "🌿", names: { EN: "Bulbasaur", JP: "フシギダネ", ZH: "妙蛙種子" } },
+                { id: "002", dex: 2, hp: 100, type: "🌿", names: { EN: "Ivysaur", JP: "フシギソウ", ZH: "妙蛙草" } },
+                { id: "003", dex: 3, hp: 160, type: "🌿", names: { EN: "Venusaur", JP: "フシギバナ", ZH: "妙蛙花" } },
+                { id: "004", dex: 4, hp: 70, type: "🔥", names: { EN: "Charmander", JP: "ヒトカゲ", ZH: "小火龍" } },
+                { id: "005", dex: 5, hp: 90, type: "🔥", names: { EN: "Charmeleon", JP: "リザード", ZH: "火恐龍" } },
+                { id: "006", dex: 6, hp: 150, type: "🔥", names: { EN: "Charizard", JP: "リザードン", ZH: "噴火龍" } },
+                { id: "007", dex: 7, hp: 60, type: "💧", names: { EN: "Squirtle", JP: "ゼニガメ", ZH: "傑尼龜" } },
+                { id: "008", dex: 8, hp: 90, type: "💧", names: { EN: "Wartortle", JP: "カメール", ZH: "卡咪龜" } },
+                { id: "009", dex: 9, hp: 140, type: "💧", names: { EN: "Blastoise", JP: "カメックス", ZH: "水箭龜" } },
+                { id: "010", dex: 25, hp: 60, type: "⚡", names: { EN: "Pikachu", JP: "ピカチュウ", ZH: "皮卡丘" } },
+                { id: "011", dex: 150, hp: 130, type: "🔮", names: { EN: "Mewtwo", JP: "ミュウツー", ZH: "超夢" } },
+                { id: "012", dex: 151, hp: 50, type: "🔮", names: { EN: "Mew", JP: "ミュウ", ZH: "夢幻" } }
+            ],
+            "base-set": [
+                { id: "001", dex: 65, hp: 120, type: "🔮", names: { EN: "Alakazam", JP: "フーディン", ZH: "胡地" } },
+                { id: "002", dex: 9, hp: 100, type: "💧", names: { EN: "Blastoise", JP: "カメックス", ZH: "水箭龜" } },
+                { id: "003", dex: 113, hp: 120, type: "⚪", names: { EN: "Chansey", JP: "ラッキー", ZH: "吉利蛋" } },
+                { id: "004", dex: 6, hp: 120, type: "🔥", names: { EN: "Charizard", JP: "リザードン", ZH: "噴火龍" } },
+                { id: "005", dex: 35, hp: 70, type: "⚪", names: { EN: "Clefairy", JP: "ピッピ", ZH: "皮皮" } },
+                { id: "006", dex: 130, hp: 100, type: "💧", names: { EN: "Gyarados", JP: "ギャラドス", ZH: "暴鯉龍" } }
+            ]
+        };
+
+        // --- State Management ---
+        let currentSet = "30th-anniversary";
+        let currentLang = "EN";
+        
+        // Generate a unique key for localStorage based on set and language 
+        // (This allows separate collections per language as requested)
+        function getStorageKey() {
+            return `pokemon_tcg_owned_${currentSet}_${currentLang}`;
+        }
+
+        // Get owned cards from LocalStorage
+        function getOwnedCards() {
+            const data = localStorage.getItem(getStorageKey());
+            return data ? JSON.parse(data) : [];
+        }
+
+        // Save owned cards to LocalStorage
+        function saveOwnedCards(ownedArray) {
+            localStorage.setItem(getStorageKey(), JSON.stringify(ownedArray));
+            updateProgress();
+        }
+
+        // --- UI Rendering ---
+        const grid = document.getElementById('card-grid');
+        const setSelect = document.getElementById('set-select');
+        const langSelect = document.getElementById('lang-select');
+        const progressText = document.getElementById('progress-text');
+        const progressFill = document.getElementById('progress-fill');
+        const resetBtn = document.getElementById('reset-btn');
+
+        function renderGrid() {
+            grid.innerHTML = ''; // Clear current grid
+            const cards = cardDatabase[currentSet];
+            const owned = getOwnedCards();
+
+            // Set code prefixes for authenticity based on language
+            const setPrefixes = {
+                "30th-anniversary": { EN: "30A-EN", JP: "S30a-JP", ZH: "CS30a-ZH" },
+                "base-set": { EN: "BS-EN", JP: "BS-JP", ZH: "BS-ZH" }
+            };
+
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card border-${currentLang.toLowerCase()}`;
+                if (owned.includes(card.id)) {
+                    cardEl.classList.add('owned');
+                }
+
+                // Image source (using official artwork from PokeAPI based on pokedex number)
+                const imgUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${card.dex}.png`;
+                const localizedName = card.names[currentLang];
+                const setStamp = setPrefixes[currentSet][currentLang];
+
+                cardEl.innerHTML = `
+                    <div class="card-header">
+                        <span>${localizedName}</span>
+                        <span>HP ${card.hp} ${card.type}</span>
+                    </div>
+                    <div class="card-art">
+                        <img src="${imgUrl}" alt="${localizedName}" loading="lazy">
+                    </div>
+                    <div class="card-footer">
+                        <span>${setStamp}</span>
+                        <span>#${card.id}</span>
+                    </div>
+                    <div class="owned-badge">✓</div>
+                `;
+
+                // Click event to toggle grayscale / color
+                cardEl.addEventListener('click', () => {
+                    const currentlyOwned = getOwnedCards();
+                    if (currentlyOwned.includes(card.id)) {
+                        // Remove from owned
+                        const newOwned = currentlyOwned.filter(id => id !== card.id);
+                        saveOwnedCards(newOwned);
+                        cardEl.classList.remove('owned');
+                    } else {
+                        // Add to owned
+                        currentlyOwned.push(card.id);
+                        saveOwnedCards(currentlyOwned);
+                        cardEl.classList.add('owned');
+                    }
+                });
+
+                grid.appendChild(cardEl);
+            });
+
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const total = cardDatabase[currentSet].length;
+            const owned = getOwnedCards().length;
+            const percentage = total === 0 ? 0 : Math.round((owned / total) * 100);
+            
+            progressText.innerText = `Progress (${currentLang}): ${owned} / ${total} Cards Owned (${percentage}%)`;
+            progressFill.style.width = `${percentage}%`;
+        }
+
+        // --- Event Listeners ---
+        setSelect.addEventListener('change', (e) => {
+            currentSet = e.target.value;
+            renderGrid();
+        });
+
+        langSelect.addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            renderGrid();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to reset your collection progress for ${currentSet} (${currentLang})?`)) {
+                localStorage.removeItem(getStorageKey());
+                renderGrid();
+            }
+        });
+
+        // Initialize App
+        renderGrid();
+    </script>
+</body>
+</html>
